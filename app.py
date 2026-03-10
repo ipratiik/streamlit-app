@@ -9,6 +9,7 @@ import os
 from google import genai
 import logging
 import warnings
+from google.cloud import storage
 
 # Suppress HuggingFace and local warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -46,19 +47,30 @@ class MultiTaskBert(nn.Module):
 def load_models():
     """Loads and caches the heavy transformer models to prevent reloading on every run."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # Load MultiTaskBert
+    # Load tokenizer and initialize model
     multitask_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     multitask_model = MultiTaskBert().to(device)
-
-    # Try loading the saved weights if they exist
-    model_path = os.path.join(os.path.dirname(__file__), "multitask_bert.pth")
+    MODEL_FILE = "multitask_bert.pth"
+    BUCKET_NAME = "run-sources-project-bd9685af-3983-407e-a25-us-central1"
+    BLOB_PATH = "services/streamlit-app/multitask_bert.pth"
+    model_path = os.path.join(os.path.dirname(__file__), MODEL_FILE)
+    # Download model if it does not exist locally
+    if not os.path.exists(model_path):
+        try:
+            st.info("Downloading model from Cloud Storage...")
+            client = storage.Client()
+            bucket = client.bucket(BUCKET_NAME)
+            blob = bucket.blob(BLOB_PATH)
+            blob.download_to_filename(model_path)
+            st.success("Model downloaded successfully.")
+        except Exception as e:
+            st.warning(f"Could not download multitask_bert.pth: {e}")
+    # Load weights if available
     if os.path.exists(model_path):
         multitask_model.load_state_dict(torch.load(model_path, map_location=device))
         multitask_model.eval()
     else:
-        st.warning("Could not find multitask_bert.pth! Using untrained Bert Model. Follow the instructions to save it from your notebook.")
-
+        st.warning("Model file still not found. Using untrained Bert Model.")
     return device, multitask_tokenizer, multitask_model
 
 # Predict function to replace mock_classification
