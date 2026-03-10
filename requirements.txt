@@ -1,0 +1,7 @@
+streamlit==1.32.0
+torch==2.5.1
+transformers==4.38.2
+pandas==2.2.1
+google-genai==0.1.2
+protobuf==4.25.3
+sentencepiece==0.2.0
